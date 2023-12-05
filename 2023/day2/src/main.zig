@@ -1,9 +1,13 @@
 const std = @import("std");
 
 pub const GameSet = struct {
-    nb_blue: i32,
-    nb_red: i32,
-    nb_green: i32,
+    nb_blue: i32 = 0,
+    nb_red: i32 = 0,
+    nb_green: i32 = 0,
+
+    pub fn init() GameSet {
+        return GameSet{ .nb_blue = 0, .nb_red = 0, .nb_green = 0 };
+    }
 };
 
 pub const Game = struct {
@@ -33,6 +37,12 @@ pub const Game = struct {
 
         std.log.info("sets_part = {s}\n", .{sets_part.?});
         var sets = try Game.parse_sets_part(allocator, sets_part.?);
+
+        std.log.info("sets:", .{});
+
+        for (sets) |set| {
+            std.log.info("  {any}\n", .{set});
+        }
 
         return Game{
             .allocator = allocator,
@@ -69,20 +79,18 @@ pub const Game = struct {
 
     pub fn parse_sets_part(allocator: std.mem.Allocator, sets_part: []const u8) ![]GameSet {
         var it_semicolon = std.mem.split(u8, sets_part, ";");
-        var nb_semicolons = std.mem.count(u8, sets_part, ";");
+        var nb_semicolons = std.mem.count(u8, sets_part, ";") + 1;
 
         var sets = try allocator.alloc(GameSet, nb_semicolons);
-        std.log.info("sets {any}", .{sets});
+        var cur_set_index: usize = 0;
 
         while (it_semicolon.next()) |set_part| {
             // set_part example "2 red, 9 green, 11 blue"
-            std.log.info("set part {s}\n", .{set_part});
             var it_comma_delimited = std.mem.split(u8, set_part, ",");
+            sets[cur_set_index] = GameSet.init();
 
             while (it_comma_delimited.next()) |color_count| {
-                std.log.info("color_count {s}\n", .{color_count});
                 var trimmed = std.mem.trim(u8, color_count, " ");
-                std.log.info("trimmed--{s}--\n", .{trimmed});
 
                 var it_color_parts = std.mem.split(u8, trimmed, " ");
                 var nb_colors_str = it_color_parts.next();
@@ -91,29 +99,33 @@ pub const Game = struct {
                     return error.GameSetMalformedColor;
                 }
 
-
                 var nb_of_color = std.fmt.parseInt(i32, nb_colors_str.?, 10) catch |err| {
                     return err;
                 };
-
-                std.log.info("nb_of_color {d}\n", .{nb_of_color});
 
                 var color = it_color_parts.next();
 
                 if (color == null) {
                     return error.GameSetMalformedColor;
                 }
-                std.log.info("color {s}\n", .{color.?});
 
-
+                if (std.mem.eql(u8, color.?, "blue")) {
+                    sets[cur_set_index].nb_blue = nb_of_color;
+                } else if (std.mem.eql(u8, color.?, "red")) {
+                    sets[cur_set_index].nb_red = nb_of_color;
+                } else if (std.mem.eql(u8, color.?, "green")) {
+                    sets[cur_set_index].nb_green = nb_of_color;
+                } else {
+                    return error.GameInvalidColor;
+                }
             }
 
+            cur_set_index += 1;
         }
 
         return sets;
     }
 };
-
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -127,7 +139,6 @@ pub fn main() !void {
     var in_stream = buf_reader.reader();
 
     var buf: [100000]u8 = undefined;
-    var sum_calibrations: i32 = 0;
 
     while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
         std.log.info("line = {s}\n", .{line});
@@ -135,11 +146,8 @@ pub fn main() !void {
         var game = try Game.init(allocator, line);
         defer game.deinit();
 
-        
         std.log.info("game -> {any}\n", .{game});
     }
-
-    std.debug.print("sum_calibrations = {d}", .{sum_calibrations});
 }
 
 test "game_id_part_to_int happy path" {
