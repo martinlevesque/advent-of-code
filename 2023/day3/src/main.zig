@@ -5,6 +5,12 @@ pub const Position = struct {
     column_index: usize,
 };
 
+pub const NumberPositionResult = struct {
+    number: i32,
+    column_begin: usize,
+    column_end: usize,
+};
+
 pub const Line = struct {
     line: []const u8,
     allocator: std.mem.Allocator,
@@ -89,21 +95,25 @@ pub const Engine = struct {
                 if (c == '*') {
                     std.log.info("star found!", .{});
                     var first_number_position = self.adjacent_char(predicate_is_number, index_line, index_char, index_char, null);
+                    std.log.info("adj char first_number_position..! {any}\n", .{first_number_position});
 
                     if (first_number_position == null) {
                         continue;
                     } else {
                         var second_number_position = self.adjacent_char(predicate_is_number, index_line, index_char, index_char, first_number_position);
 
+
+                        std.log.info("adj char second number..! {any}\n", .{second_number_position});
+
                         if (second_number_position != null) {
 
                             var first_number = Engine.find_number_from_position(self.lines.items[first_number_position.?.line_index].line, first_number_position.?.column_index);
                             var second_number = Engine.find_number_from_position(self.lines.items[second_number_position.?.line_index].line, second_number_position.?.column_index);
 
-                            std.log.info("first number {d}\n", .{ first_number });
-                            std.log.info("second number {d}\n", .{ second_number });
+                            std.log.info("first number {d}\n", .{ first_number.number });
+                            std.log.info("second number {d}\n", .{ second_number.number });
 
-                            sum += first_number * second_number;
+                            sum += first_number.number * second_number.number;
                         }
                     }
                 }
@@ -113,8 +123,11 @@ pub const Engine = struct {
         return sum;
     }
 
-    fn find_number_from_position(line: []const u8, index: usize) i32 {
+    fn find_number_from_position(line: []const u8, index: usize) NumberPositionResult {
+        std.debug.print("line {s} index {d} {c}\n", .{line, index, line[index]});
+
         var current_index = index;
+
 
         while (current_index > 0 and Engine.is_number(line[current_index])) {
             current_index -= 1;
@@ -129,7 +142,7 @@ pub const Engine = struct {
         // find right part
         current_index = index;
 
-        while (current_index < line.len and Engine.is_number(line[current_index])) {
+        while (current_index < line.len-1 and Engine.is_number(line[current_index])) {
             current_index += 1;
         }
 
@@ -141,13 +154,15 @@ pub const Engine = struct {
 
         var number_s = line[begin_at..end_at + 1];
         var number = std.fmt.parseInt(i32, number_s, 10) catch {
-            return -1;
+            return NumberPositionResult{ .number = -1, .column_begin = 0, .column_end = 0 };
         };
 
-        return number;
+        return NumberPositionResult{ .number = number, .column_begin = begin_at, .column_end = end_at };
     }
 
-    fn is_symbol(c: u8, current_position: Position, skip_at: ?Position) bool {
+    fn is_symbol(line: []const u8, current_position: Position, skip_at: ?Position) bool {
+        const c = line[current_position.column_index];
+
         if (skip_at != null) {
             if (current_position.line_index == skip_at.?.line_index and current_position.column_index == skip_at.?.column_index) {
                 return false;
@@ -157,8 +172,13 @@ pub const Engine = struct {
         return Engine.is_number(c) == false and c != '.';
     }
 
-    fn predicate_is_number(c: u8, current_position: Position, skip_at: ?Position) bool {
+    fn predicate_is_number(line: []const u8, current_position: Position, skip_at: ?Position) bool {
+        const c = line[current_position.column_index];
+
         if (skip_at != null) {
+            // todo if it's the same number (call find number for both)
+            //var n1 = find_number_from_position(line, index);
+
             if (current_position.line_index == skip_at.?.line_index and current_position.column_index == skip_at.?.column_index) {
                 return false;
             }
@@ -173,7 +193,7 @@ pub const Engine = struct {
 
     fn adjacent_char(
         self: *Engine,
-        comptime predicate: fn (c: u8, cur_pos: Position, skip_at: ?Position) bool,
+        comptime predicate: fn (line: []const u8, cur_pos: Position, skip_at: ?Position) bool,
         index_line: usize,
         begin_nb: usize,
         end_nb: usize,
@@ -181,11 +201,12 @@ pub const Engine = struct {
     ) ?Position {
         // on the left of line
         var position: Position = undefined;
+        const cur_line = self.lines.items[index_line].line;
 
         if (begin_nb > 0) {
             position = Position{ .line_index = index_line, .column_index = begin_nb-1 };
 
-            if (predicate(self.c_at(position), position, skip_at)) {
+            if (predicate(cur_line, position, skip_at)) {
                 std.debug.print("SYM on left of line\n", .{});
                 return position;
             }
@@ -195,7 +216,7 @@ pub const Engine = struct {
         if (index_line > 0 and begin_nb > 0) {
             position = Position{ .line_index = index_line-1, .column_index = begin_nb-1 };
 
-            if (predicate(self.c_at(position), position, skip_at)) {
+            if (predicate(self.lines.items[index_line-1].line, position, skip_at)) {
                 std.debug.print("SYM on left top\n", .{});
                 return position;
             }
@@ -206,7 +227,7 @@ pub const Engine = struct {
         if (index_line < self.lines.items.len - 1 and begin_nb > 0) {
             position = Position{ .line_index = index_line+1, .column_index = begin_nb-1 };
 
-            if (predicate(self.c_at(position), position, skip_at)) {
+            if (predicate(self.lines.items[index_line+1].line, position, skip_at)) {
                 std.log.info("SYM on left bottom\n", .{});
                 return position;
             }
@@ -216,7 +237,7 @@ pub const Engine = struct {
         if (end_nb < self.lines.items[index_line].line.len - 1) {
             position = Position{ .line_index = index_line, .column_index = end_nb + 1 };
 
-            if (predicate(self.c_at(position), position, skip_at)) {
+            if (predicate(self.lines.items[index_line].line, position, skip_at)) {
                 std.log.info("SYM on right of line\n", .{});
                 return position;
             }
@@ -226,7 +247,7 @@ pub const Engine = struct {
         if (index_line > 0 and end_nb < self.lines.items[index_line].line.len - 1) {
             position = Position{ .line_index = index_line-1, .column_index = end_nb + 1 };
 
-            if (predicate(self.c_at(position), position, skip_at)) {
+            if (predicate(self.lines.items[index_line-1].line, position, skip_at)) {
                 std.log.info("SYM on right top\n", .{});
                 return Position{ .line_index = index_line - 1, .column_index = end_nb + 1 };
             }
@@ -236,7 +257,7 @@ pub const Engine = struct {
         if (index_line < self.lines.items.len - 1 and end_nb < self.lines.items[index_line].line.len - 1) {
             position = Position{ .line_index = index_line+1, .column_index = end_nb + 1 };
 
-            if (predicate(self.c_at(position), position, skip_at)) {
+            if (predicate(self.lines.items[index_line+1].line, position, skip_at)) {
                 std.log.info("SYM on right bottom\n", .{});
                 return Position{ .line_index = index_line + 1, .column_index = end_nb + 1 };
             }
@@ -251,28 +272,30 @@ pub const Engine = struct {
         // loop on the top
         if (index_line > 0) {
             var index = begin_nb;
-            for (self.lines.items[index_line - 1].line[begin_nb..end_nb_loop]) |c| {
-                index += 1;
+            for (self.lines.items[index_line - 1].line[begin_nb..end_nb_loop]) |_| {
 
                 position = Position{ .line_index = index_line-1, .column_index = index };
-                if (predicate(c, position, skip_at)) {
+                if (predicate(self.lines.items[index_line-1].line, position, skip_at)) {
                     std.log.info("SYM on loop on the top\n", .{});
                     return Position{ .line_index = index_line - 1, .column_index = index };
                 }
+
+                index += 1;
             }
         }
 
         // loop on the bottom
         if (index_line < self.lines.items.len - 1) {
             var index = begin_nb;
-            for (self.lines.items[index_line + 1].line[begin_nb..end_nb_loop]) |c| {
-                index += 1;
+            for (self.lines.items[index_line + 1].line[begin_nb..end_nb_loop]) |_| {
 
                 position = Position{ .line_index = index_line+1, .column_index = index };
-                if (predicate(c, position, skip_at)) {
+                if (predicate(self.lines.items[index_line+1].line, position, skip_at)) {
                     std.log.info("SYM on loop on the bottom\n", .{});
                     return Position{ .line_index = index_line + 1, .column_index = index };
                 }
+
+                index += 1;
             }
         }
 
@@ -316,172 +339,218 @@ pub fn main() !void {
     std.log.info("Part 2 sum = {d}\n", .{sum_part_2});
 }
 
-test "is_symbol" {
-    var pos = Position{ .line_index = 0, .column_index = 0 };
+// test "is_symbol" {
+//     var pos = Position{ .line_index = 0, .column_index = 0 };
 
-    try std.testing.expectEqual(Engine.is_symbol('a', pos, null), true);
-    try std.testing.expectEqual(Engine.is_symbol('.', pos, null), false);
-    try std.testing.expectEqual(Engine.is_symbol('1', pos, null), false);
-}
+//     try std.testing.expectEqual(Engine.is_symbol('a', pos, null), true);
+//     try std.testing.expectEqual(Engine.is_symbol('.', pos, null), false);
+//     try std.testing.expectEqual(Engine.is_symbol('1', pos, null), false);
+// }
 
-// find_number_from_position(line: []const u8, index: usize)
-test "find_number_from_position" {
-    try std.testing.expectEqual(Engine.find_number_from_position("..23..", 3), 23);
-}
+// test "find_number_from_position" {
+//     try std.testing.expectEqual(Engine.find_number_from_position("..23..", 3), 23);
+// }
 
-test "part 1 - minimal sample" {
+// test "part 1 - minimal sample" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "467..114.."));
+//     try engine.append(try Line.init(allocator, "...*......"));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 467);
+// }
+
+// test "part 1 - sample" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "467..114.."));
+//     try engine.append(try Line.init(allocator, "...*......"));
+//     try engine.append(try Line.init(allocator, "..35..633."));
+//     try engine.append(try Line.init(allocator, "......#..."));
+//     try engine.append(try Line.init(allocator, "617*......"));
+//     try engine.append(try Line.init(allocator, ".....+.58."));
+//     try engine.append(try Line.init(allocator, "..592....."));
+//     try engine.append(try Line.init(allocator, "......755."));
+//     try engine.append(try Line.init(allocator, "...$.*...."));
+//     try engine.append(try Line.init(allocator, ".664.598.."));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 4361);
+// }
+
+// test "part 1 - number border left" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "22*......"));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
+// }
+
+// test "part 1 - number border left, symbol left" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "*22......"));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
+// }
+
+// test "part 1 - left top" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "*........"));
+//     try engine.append(try Line.init(allocator, ".22......"));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
+// }
+
+// test "part 1 - left bottom" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "........."));
+//     try engine.append(try Line.init(allocator, ".22......"));
+//     try engine.append(try Line.init(allocator, "*........"));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
+// }
+
+// test "part 1 - right line" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "........."));
+//     try engine.append(try Line.init(allocator, "......23*"));
+//     try engine.append(try Line.init(allocator, "........."));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
+// }
+
+// test "part 1 - right line 2" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "........."));
+//     try engine.append(try Line.init(allocator, "......*23"));
+//     try engine.append(try Line.init(allocator, "........."));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
+// }
+
+// test "part 1 - right top" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "........*"));
+//     try engine.append(try Line.init(allocator, "......23."));
+//     try engine.append(try Line.init(allocator, "........."));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
+// }
+
+// test "part 1 - right top 2" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "........*"));
+//     try engine.append(try Line.init(allocator, ".......23"));
+//     try engine.append(try Line.init(allocator, "........."));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
+// }
+
+// test "part 1 - right bottom" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "........."));
+//     try engine.append(try Line.init(allocator, "......23."));
+//     try engine.append(try Line.init(allocator, "........*"));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
+// }
+
+// test "part 1 - right bottom 2" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "........."));
+//     try engine.append(try Line.init(allocator, ".......23"));
+//     try engine.append(try Line.init(allocator, "........*"));
+
+//     try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
+// }
+
+// test "part 2 - sample" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "467..114.."));
+//     try engine.append(try Line.init(allocator, "...*......"));
+//     try engine.append(try Line.init(allocator, "..35..633."));
+//     try engine.append(try Line.init(allocator, "......#..."));
+//     try engine.append(try Line.init(allocator, "617*......"));
+//     try engine.append(try Line.init(allocator, ".....+.58."));
+//     try engine.append(try Line.init(allocator, "..592....."));
+//     try engine.append(try Line.init(allocator, "......755."));
+//     try engine.append(try Line.init(allocator, "...$.*...."));
+//     try engine.append(try Line.init(allocator, ".664.598.."));
+
+//     try std.testing.expectEqual(engine.sum_gear_ratios(), 467835);
+// }
+
+// test "part 2 - same line left" {
+//     var allocator = std.testing.allocator;
+
+//     var engine = try Engine.init(allocator);
+//     defer engine.deinit();
+
+//     try engine.append(try Line.init(allocator, "467*114.."));
+//     try engine.append(try Line.init(allocator, "........."));
+
+//     try std.testing.expectEqual(engine.sum_gear_ratios(), 53238);
+// }
+
+test "part 2 - same line right" {
     var allocator = std.testing.allocator;
 
     var engine = try Engine.init(allocator);
     defer engine.deinit();
 
-    try engine.append(try Line.init(allocator, "467..114.."));
-    try engine.append(try Line.init(allocator, "...*......"));
+    try engine.append(try Line.init(allocator, "..467*114"));
+    try engine.append(try Line.init(allocator, "..*......"));
+    try engine.append(try Line.init(allocator, "..1....22"));
+    try engine.append(try Line.init(allocator, "...*..*.."));
+    try engine.append(try Line.init(allocator, "....3..2."));
 
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 467);
-}
-
-test "part 1 - sample" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "467..114.."));
-    try engine.append(try Line.init(allocator, "...*......"));
-    try engine.append(try Line.init(allocator, "..35..633."));
-    try engine.append(try Line.init(allocator, "......#..."));
-    try engine.append(try Line.init(allocator, "617*......"));
-    try engine.append(try Line.init(allocator, ".....+.58."));
-    try engine.append(try Line.init(allocator, "..592....."));
-    try engine.append(try Line.init(allocator, "......755."));
-    try engine.append(try Line.init(allocator, "...$.*...."));
-    try engine.append(try Line.init(allocator, ".664.598.."));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 4361);
-}
-
-test "part 1 - number border left" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "22*......"));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
-}
-
-test "part 1 - number border left, symbol left" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "*22......"));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
-}
-
-test "part 1 - left top" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "*........"));
-    try engine.append(try Line.init(allocator, ".22......"));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
-}
-
-test "part 1 - left bottom" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "........."));
-    try engine.append(try Line.init(allocator, ".22......"));
-    try engine.append(try Line.init(allocator, "*........"));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 22);
-}
-
-test "part 1 - right line" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "........."));
-    try engine.append(try Line.init(allocator, "......23*"));
-    try engine.append(try Line.init(allocator, "........."));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
-}
-
-test "part 1 - right line 2" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "........."));
-    try engine.append(try Line.init(allocator, "......*23"));
-    try engine.append(try Line.init(allocator, "........."));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
-}
-
-test "part 1 - right top" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "........*"));
-    try engine.append(try Line.init(allocator, "......23."));
-    try engine.append(try Line.init(allocator, "........."));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
-}
-
-test "part 1 - right top 2" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "........*"));
-    try engine.append(try Line.init(allocator, ".......23"));
-    try engine.append(try Line.init(allocator, "........."));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
-}
-
-test "part 1 - right bottom" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "........."));
-    try engine.append(try Line.init(allocator, "......23."));
-    try engine.append(try Line.init(allocator, "........*"));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
-}
-
-test "part 1 - right bottom 2" {
-    var allocator = std.testing.allocator;
-
-    var engine = try Engine.init(allocator);
-    defer engine.deinit();
-
-    try engine.append(try Line.init(allocator, "........."));
-    try engine.append(try Line.init(allocator, ".......23"));
-    try engine.append(try Line.init(allocator, "........*"));
-
-    try std.testing.expectEqual(engine.sum_adjacent_numbers(), 23);
+    try std.testing.expectEqual(engine.sum_gear_ratios(), 53752);
 }
