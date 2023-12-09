@@ -6,7 +6,7 @@ pub const Card = struct {
     allocator: std.mem.Allocator,
     winning_numbers: std.ArrayList(i32),
     player_numbers: std.ArrayList(i32),
-    id: i32,
+    id: usize,
 
     pub fn init(line: []const u8, allocator: std.mem.Allocator) !Card {
         // split by :
@@ -19,7 +19,7 @@ pub const Card = struct {
         }
 
         var trimmed_card_id = std.mem.trim(u8, card_id_part.?, "Card ");
-        var card_id = try std.fmt.parseInt(i32, trimmed_card_id, 10);
+        var card_id = try std.fmt.parseInt(usize, trimmed_card_id, 10);
 
         var card_line_part = it.next();
 
@@ -43,8 +43,6 @@ pub const Card = struct {
 
         var winning_numbers = try Card.read_numbers(winning_part.?, allocator);
         var player_numbers = try Card.read_numbers(player_part.?, allocator);
-
-        //var winning_numbers = Card.read_numbers(winning_part.?, allocator);
 
         return Card{
             .original_line = line,
@@ -92,8 +90,8 @@ pub const Card = struct {
         return result;
     }
 
-    pub fn nb_matchings(self: *Card) i32 {
-        var result: i32 = 0;
+    pub fn nb_matchings(self: *const Card) usize {
+        var result: usize = 0;
 
         for (self.player_numbers.items) |player_number| {
             for (self.winning_numbers.items) |winning_number| {
@@ -101,6 +99,31 @@ pub const Card = struct {
                     result += 1;
                 }
             }
+        }
+
+        return result;
+    }
+
+    pub fn count_ending_scratchboards_for(card: Card, cards: std.ArrayList(Card)) usize {
+        var result: usize = 1; // the card itself
+
+        var total_matchings = card.nb_matchings();
+
+        var i = card.id;
+
+        while (i < card.id + total_matchings and i < cards.items.len) : (i += 1) {
+            var current_card = cards.items[i];
+            result += count_ending_scratchboards_for(current_card, cards);
+        }
+
+        return result;
+    }
+
+    pub fn count_ending_scratchboards(cards: std.ArrayList(Card)) usize {
+        var result: usize = 0;
+
+        for (cards.items) |card| {
+            result += count_ending_scratchboards_for(card, cards);
         }
 
         return result;
@@ -137,14 +160,12 @@ pub fn main() !void {
     }
 
     std.log.info("part 1 result: {d}\n", .{result});
+    std.log.info("part 2 result: {d}\n", .{Card.count_ending_scratchboards(cards)});
 
     for (cards.items) |*card| {
-        std.log.info("freeing..\n", .{});
         card.deinit();
     }
 }
-
-// read_numbers(line: []const u8, allocator: std.mem.Allocator) !std.ArrayList(i32)
 
 test "read_numbers" {
     var allocator = std.testing.allocator;
@@ -226,4 +247,38 @@ test "part 1 sample" {
     var result: i32 = result_1.count_points() + result_2.count_points() + result_3.count_points() + result_4.count_points() + result_5.count_points() + result_6.count_points();
 
     try std.testing.expectEqual(result, 13);
+
+    var cards = std.ArrayList(Card).init(allocator);
+    defer cards.deinit();
+
+    try cards.append(result_1);
+    try cards.append(result_2);
+    try cards.append(result_3);
+    try cards.append(result_4);
+    try cards.append(result_5);
+    try cards.append(result_6);
+
+    try std.testing.expectEqual(Card.count_ending_scratchboards(cards), 30);
+}
+
+test "count_ending_scratchboards_for" {
+    var allocator = std.testing.allocator;
+
+    var card_1 = try Card.init("Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53", allocator); // 4 matchings
+    defer card_1.deinit();
+
+    var card_2 = try Card.init("Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19", allocator); // 2 matchings
+    defer card_2.deinit();
+
+    var card_3 = try Card.init("Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1", allocator); // 2 matchings
+    defer card_3.deinit();
+
+    var cards = std.ArrayList(Card).init(allocator);
+    defer cards.deinit();
+
+    try cards.append(card_1);
+    try cards.append(card_2);
+    try cards.append(card_3);
+
+    try std.testing.expectEqual(Card.count_ending_scratchboards_for(card_1, cards), 4);
 }
