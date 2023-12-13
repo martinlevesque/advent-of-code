@@ -42,24 +42,56 @@ pub const Hand = struct {
         return counts;
     }
 
-
-    pub fn is_five_of_a_kind(self: Hand) bool {
-        return std.mem.count(u8, self.cards, self.cards[0..1]) == 5;
-    }
-
-    pub fn is_four_of_a_kind(self: Hand) !bool {
+    fn has_n_chars(self: *const Hand, n: u32) !bool {
         var occurences = try self.count_chars_occurences();
         defer occurences.deinit();
 
         var it = occurences.iterator();
 
         while (it.next()) |entry| {
-            if (entry.value_ptr.* == 4) {
+            if (entry.value_ptr.* == n) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    pub fn is_four_of_a_kind(self: *const Hand) !bool {
+        return self.has_n_chars(4);
+    }
+
+    pub fn is_five_of_a_kind(self: *const Hand) !bool {
+        return self.has_n_chars(5);
+    }
+
+    pub fn is_full_house(self: *const Hand) !bool {
+        return try self.has_n_chars(2) and try self.has_n_chars(3);
+    }
+
+    pub fn is_three_of_a_kind(self: *const Hand) !bool {
+        return try self.has_n_chars(3) and try self.has_n_chars(2) == false;
+    }
+
+    pub fn is_two_pair(self: *const Hand) !bool {
+        var occurences = try self.count_chars_occurences();
+        defer occurences.deinit();
+
+        return try self.has_n_chars(2) and occurences.count() == 3;
+    }
+
+    pub fn is_one_pair(self: *const Hand) !bool {
+        var occurences = try self.count_chars_occurences();
+        defer occurences.deinit();
+
+        return try self.has_n_chars(2) and occurences.count() == 4;
+    }
+
+    pub fn is_high_card(self: *const Hand) !bool {
+        var occurences = try self.count_chars_occurences();
+        defer occurences.deinit();
+
+        return occurences.count() == 5;
     }
 };
 
@@ -99,10 +131,10 @@ test "Hand.init" {
 test "is_five_of_a_kind" {
     var allocator = std.testing.allocator;
     var hand = try Hand.init(allocator, "AAAAA 100");
-    try std.testing.expectEqual(hand.is_five_of_a_kind(), true);
+    try std.testing.expectEqual(try hand.is_five_of_a_kind(), true);
 
     hand = try Hand.init(allocator, "2AAAA 100");
-    try std.testing.expectEqual(hand.is_five_of_a_kind(), false);
+    try std.testing.expectEqual(try hand.is_five_of_a_kind(), false);
 }
 
 test "is_four_of_a_kind" {
@@ -112,6 +144,60 @@ test "is_four_of_a_kind" {
 
     hand = try Hand.init(allocator, "2AAAA 100");
     try std.testing.expectEqual(try hand.is_four_of_a_kind(), true);
+}
+
+test "is_full_house" {
+    var allocator = std.testing.allocator;
+    var hand = try Hand.init(allocator, "AAAAA 100");
+    try std.testing.expectEqual(try hand.is_full_house(), false);
+
+    hand = try Hand.init(allocator, "AABBB 100");
+    try std.testing.expectEqual(try hand.is_full_house(), true);
+
+    hand = try Hand.init(allocator, "ABABB 100");
+    try std.testing.expectEqual(try hand.is_full_house(), true);
+}
+
+test "is_three_of_a_kind" {
+    var allocator = std.testing.allocator;
+    var hand = try Hand.init(allocator, "ABBB8 100");
+    try std.testing.expectEqual(try hand.is_three_of_a_kind(), true);
+
+    hand = try Hand.init(allocator, "AABBB 100");
+    try std.testing.expectEqual(try hand.is_three_of_a_kind(), false);
+
+    hand = try Hand.init(allocator, "A1100 100");
+    try std.testing.expectEqual(try hand.is_three_of_a_kind(), false);
+}
+
+test "is_two_pair" {
+    var allocator = std.testing.allocator;
+    var hand = try Hand.init(allocator, "1BB22 100");
+    try std.testing.expectEqual(try hand.is_two_pair(), true);
+
+    hand = try Hand.init(allocator, "AABBB 100");
+    try std.testing.expectEqual(try hand.is_two_pair(), false);
+
+    hand = try Hand.init(allocator, "AA123 100");
+    try std.testing.expectEqual(try hand.is_two_pair(), false);
+}
+
+test "is_one_pair" {
+    var allocator = std.testing.allocator;
+    var hand = try Hand.init(allocator, "1BB35 100");
+    try std.testing.expectEqual(try hand.is_one_pair(), true);
+
+    hand = try Hand.init(allocator, "AABB1 100");
+    try std.testing.expectEqual(try hand.is_one_pair(), false);
+}
+
+test "is_high_card" {
+    var allocator = std.testing.allocator;
+    var hand = try Hand.init(allocator, "12345 100");
+    try std.testing.expectEqual(try hand.is_high_card(), true);
+
+    hand = try Hand.init(allocator, "AA234 100");
+    try std.testing.expectEqual(try hand.is_high_card(), false);
 }
 
 test "count_chars_occurences" {
