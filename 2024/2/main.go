@@ -10,6 +10,14 @@ import (
 	"strings"
 )
 
+func directionOf(firstItem int, secondItem int) string {
+	if secondItem < firstItem {
+		return "decreasing"
+	} else {
+		return "increasing"
+	}
+}
+
 func reportSafe(report []string) bool {
 
 	direction := ""
@@ -26,20 +34,10 @@ func reportSafe(report []string) bool {
 			return false
 		}
 
-		currentDirection := ""
-
-		if nextItemI < currentItemI {
-			currentDirection = "decreasing"
-		} else {
-			currentDirection = "increasing"
-		}
+		currentDirection := directionOf(currentItemI, nextItemI)
 
 		if direction == "" {
-			if nextItemI < currentItemI {
-				direction = "decreasing"
-			} else {
-				direction = "increasing"
-			}
+			direction = directionOf(currentItemI, nextItemI)
 		} else if currentDirection != direction {
 			return false
 		}
