@@ -39,8 +39,7 @@ func stringWith(matrix *[][]rune, coords []Coord) string {
 	return string(runesResult)
 }
 
-func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
-	log.Println("============== cur row+1 = ", rowIndex+1)
+func findInRowPart1(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 	targetRunes := []rune(target)
 	targetLen := len(targetRunes)
 	result := []ResultEntry{}
@@ -49,10 +48,8 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 
 	// loop over columns
 	for j := 0; j < lenRow; j++ {
-		log.Println("j+1 = ", j+1)
 		// from left to right
 		if j+targetLen <= lenRow && string((*matrix)[rowIndex][j:j+targetLen]) == string(targetRunes) {
-			log.Printf("found at row %d, column %d\n", rowIndex, j)
 			result = append(result, ResultEntry{
 				rowBegin:    rowIndex,
 				columnBegin: j,
@@ -60,7 +57,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 				columnEnd:   j + targetLen - 1,
 			})
 		} else if j+targetLen <= lenRow && reverseString(string((*matrix)[rowIndex][j:j+targetLen])) == string(targetRunes) {
-			log.Printf("found reverse at row %d, column %d\n", rowIndex, j-1)
 
 			result = append(result, ResultEntry{
 				rowBegin:    rowIndex,
@@ -79,7 +75,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 			}
 
 			if stringWith(matrix, coords) == string(targetRunes) {
-				log.Printf("found vertical down at row %d, column %d\n", rowIndex, j)
 				result = append(result, ResultEntry{
 					rowBegin:    rowIndex,
 					columnBegin: j,
@@ -87,7 +82,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 					columnEnd:   j,
 				})
 			} else if reverseString(stringWith(matrix, coords)) == string(targetRunes) {
-				log.Printf("found vertical reversed at row %d, column %d\n", rowIndex, j)
 				result = append(result, ResultEntry{
 					rowBegin:    rowIndex + 3,
 					columnBegin: j,
@@ -97,7 +91,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 			}
 		}
 
-		log.Println("in here 1")
 		if rowIndex+targetLen <= len(*matrix) && j+targetLen <= lenRow {
 			// diag
 			coords := []Coord{
@@ -108,7 +101,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 			}
 
 			if stringWith(matrix, coords) == string(targetRunes) {
-				log.Printf("found diag down right at row %d, column %d\n", rowIndex, j)
 				result = append(result, ResultEntry{
 					rowBegin:    rowIndex,
 					columnBegin: j,
@@ -116,7 +108,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 					columnEnd:   j + 3,
 				})
 			} else if reverseString(stringWith(matrix, coords)) == string(targetRunes) {
-				log.Printf("found diag down right reversed at row %d, column %d\n", rowIndex, j)
 				result = append(result, ResultEntry{
 					rowBegin:    rowIndex + 3,
 					columnBegin: j + 3,
@@ -136,7 +127,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 			}
 
 			if stringWith(matrix, coords) == string(targetRunes) {
-				log.Printf("found diag down left at row %d, column %d\n", rowIndex, j)
 				result = append(result, ResultEntry{
 					rowBegin:    rowIndex,
 					columnBegin: j,
@@ -144,7 +134,6 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 					columnEnd:   j - 3,
 				})
 			} else if reverseString(stringWith(matrix, coords)) == string(targetRunes) {
-				log.Printf("found diag down left reversed at row %d, column %d\n", rowIndex, j)
 				result = append(result, ResultEntry{
 					rowBegin:    rowIndex + 3,
 					columnBegin: j - 3,
@@ -158,24 +147,46 @@ func findInRow(rowIndex int, matrix *[][]rune, target string) []ResultEntry {
 	return result
 }
 
-func findXmas(matrix *[][]rune) int {
-	result := []ResultEntry{}
+func findInRowPart2(rowIndex int, m *[][]rune) int {
+	lenRow := len((*m)[rowIndex])
+	result := 0
 
-	for i, _ := range *matrix { // 'i' is the row index, 'row' is the slice of runes
-		curRes := findInRow(i, matrix, "XMAS")
+	// loop over columns
+	for j := 0; j < lenRow; j++ {
 
-		for _, entry := range curRes {
-			result = append(result, entry)
-			log.Println("adding", entry)
+		// look for a A
+		if rowIndex >= 1 && j < lenRow-1 && j > 0 && rowIndex < len(*m)-1 {
+			if (*m)[rowIndex][j] == 'A' {
+				if (((*m)[rowIndex-1][j-1] == 'M' && (*m)[rowIndex+1][j+1] == 'S') ||
+					((*m)[rowIndex-1][j-1] == 'S' && (*m)[rowIndex+1][j+1] == 'M')) &&
+					(((*m)[rowIndex+1][j-1] == 'M' && (*m)[rowIndex-1][j+1] == 'S') ||
+						((*m)[rowIndex+1][j-1] == 'S' && (*m)[rowIndex-1][j+1] == 'M')) {
+					result += 1
+				}
+			}
 		}
 	}
 
-	return len(result)
+	return result
+}
+
+func findXmas(matrix *[][]rune) (int, int) {
+	result := []ResultEntry{}
+	resultPart2 := 0
+
+	for i, _ := range *matrix {
+		resultPart1 := findInRowPart1(i, matrix, "XMAS")
+		resultPart2 += findInRowPart2(i, matrix)
+
+		for _, entry := range resultPart1 {
+			result = append(result, entry)
+		}
+	}
+
+	return len(result), resultPart2
 }
 
 func main() {
-	log.Println("yo.")
-
 	file, err := os.Open("input.txt")
 
 	if err != nil {
@@ -199,9 +210,8 @@ func main() {
 		matrix = append(matrix, row) // Append the row to the matrix
 	}
 
-	resultPart1 := findXmas(&matrix)
+	resultPart1, resultPart2 := findXmas(&matrix)
 
 	log.Println("result part 1 ", resultPart1)
-	log.Printf("%c", matrix[0][0])
-	log.Printf("%c", matrix[0][6])
+	log.Println("result part 2 ", resultPart2)
 }
