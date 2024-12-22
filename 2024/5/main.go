@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -14,7 +15,7 @@ type PageOrdering struct {
 }
 
 type PageUpdate struct {
-	Updates []string
+	Pages []string
 }
 
 func parsePageOrdering(line string) PageOrdering {
@@ -30,8 +31,38 @@ func parsePageUpdate(line string) PageUpdate {
 	parts := strings.Split(line, ",")
 
 	return PageUpdate{
-		Updates: parts,
+		Pages: parts,
 	}
+}
+
+func updateInCorrectOrder(update PageUpdate, orderings *map[string][]PageOrdering) bool {
+	for kIndex, kItem := range update.Pages {
+		for jIndex, jItem := range update.Pages {
+			if jIndex <= kIndex {
+				continue
+			}
+
+			jOrderings := (*orderings)[jItem]
+
+			for _, orderingItem := range jOrderings {
+				if kItem == orderingItem.Y && jItem == orderingItem.X {
+					return false
+				}
+			}
+		}
+	}
+
+	return true
+}
+
+func getMiddleItem(arr []string) string {
+	if len(arr) == 0 {
+		return "" // Return an empty string if the array is empty
+	}
+
+	middleIndex := len(arr) / 2
+
+	return arr[middleIndex]
 }
 
 func main() {
@@ -51,11 +82,10 @@ func main() {
 	}
 
 	pageOrderingLookup := make(map[string][]PageOrdering)
+	result := 0
 
 	for scanner.Scan() {
 		line := scanner.Text() // Read the current line as a string
-
-		log.Println(line)
 
 		if strings.Contains(line, "|") {
 			pageOrdering := parsePageOrdering(line)
@@ -65,21 +95,18 @@ func main() {
 			}
 
 			pageOrderingLookup[pageOrdering.X] = append(pageOrderingLookup[pageOrdering.X], pageOrdering)
-
-			if _, ok := pageOrderingLookup[pageOrdering.Y]; !ok {
-				pageOrderingLookup[pageOrdering.Y] = []PageOrdering{}
-			}
-
-			pageOrderingLookup[pageOrdering.Y] = append(pageOrderingLookup[pageOrdering.Y], pageOrdering)
 		} else if strings.Contains(line, ",") {
 			pageUpdate := parsePageUpdate(line)
-			log.Println("new page update ", pageUpdate)
+
+			if updateInCorrectOrder(pageUpdate, &pageOrderingLookup) {
+				middleNumber, _ := strconv.Atoi(getMiddleItem(pageUpdate.Pages))
+
+				result += middleNumber
+			}
 		}
 
 	}
 
-	for k, v := range pageOrderingLookup {
-		log.Printf("%s -> %v\n", k, v)
-	}
+	log.Println("result = ", result)
 
 }
