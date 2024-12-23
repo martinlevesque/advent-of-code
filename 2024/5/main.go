@@ -65,6 +65,28 @@ func getMiddleItem(arr []string) string {
 	return arr[middleIndex]
 }
 
+func reorderPages(update PageUpdate, orderings *map[string][]PageOrdering) []string {
+	ordered := update.Pages
+
+	for {
+		changed := false
+		for i := 0; i < len(ordered)-1; i++ {
+			for _, ordering := range (*orderings)[ordered[i+1]] {
+				if ordering.X == ordered[i+1] && ordering.Y == ordered[i] {
+					// Swap the two elements to fix the order
+					ordered[i], ordered[i+1] = ordered[i+1], ordered[i]
+					changed = true
+				}
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+
+	return ordered
+}
+
 func main() {
 	file, err := os.Open("input.txt")
 
@@ -83,6 +105,7 @@ func main() {
 
 	pageOrderingLookup := make(map[string][]PageOrdering)
 	result := 0
+	resultPart2 := 0
 
 	for scanner.Scan() {
 		line := scanner.Text() // Read the current line as a string
@@ -102,11 +125,21 @@ func main() {
 				middleNumber, _ := strconv.Atoi(getMiddleItem(pageUpdate.Pages))
 
 				result += middleNumber
+			} else {
+				newResult := reorderPages(pageUpdate, &pageOrderingLookup)
+				newPageUpdate := PageUpdate{
+					Pages: newResult,
+				}
+
+				middleNumber, _ := strconv.Atoi(getMiddleItem(newPageUpdate.Pages))
+
+				resultPart2 += middleNumber
 			}
 		}
 
 	}
 
 	log.Println("result = ", result)
+	log.Println("result part 2 = ", resultPart2)
 
 }
