@@ -72,35 +72,6 @@ func parseEquation(line string) Equation {
 	}
 }
 
-func (eq Equation) equationResult(setUnknownOperatorTo *EquationElement) int {
-	result := 0
-	previousOperator := EquationElement{}
-
-	for _, element := range eq.Elements {
-		if result == 0 {
-			result = element.Number
-		}
-
-		if element.Type == "Operator" {
-			if element.Operator == "?" && setUnknownOperatorTo != nil {
-				previousOperator = *setUnknownOperatorTo
-			} else {
-				previousOperator = element
-			}
-		} else {
-			// it's a number
-
-			if previousOperator.Operator == "+" {
-				result = result + element.Number
-			} else if previousOperator.Operator == "*" {
-				result = result * element.Number
-			}
-		}
-	}
-
-	return result
-}
-
 func equationResultIncremental(currentResult int, nextNumber int, operator string) int {
 	switch operator {
 	case "+":
