@@ -78,12 +78,14 @@ func equationResultIncremental(currentResult int, nextNumber int, operator strin
 		return currentResult + nextNumber
 	case "*":
 		return currentResult * nextNumber
+	case "||":
+		return stringToInt(strconv.Itoa(currentResult) + strconv.Itoa(nextNumber))
 	default:
 		return currentResult // Default case for unhandled operators
 	}
 }
 
-func resolveEquation(eq *Equation, currentResult int, index int) *Equation {
+func resolveEquation(eq *Equation, currentResult int, index int, operators []string) *Equation {
 	if currentResult > eq.Result {
 		return nil
 	}
@@ -99,13 +101,13 @@ func resolveEquation(eq *Equation, currentResult int, index int) *Equation {
 	element := &eq.Elements[index]
 
 	if element.Type == "Operator" && element.Operator == "?" {
-		for _, op := range []string{"+", "*"} {
+		for _, op := range operators {
 			element.Operator = op
 
 			// Compute the result for the next number
 			nextResult := equationResultIncremental(currentResult, eq.Elements[index+1].Number, op)
 
-			if result := resolveEquation(eq, nextResult, index+2); result != nil {
+			if result := resolveEquation(eq, nextResult, index+2, operators); result != nil {
 				return result
 			}
 		}
@@ -116,7 +118,7 @@ func resolveEquation(eq *Equation, currentResult int, index int) *Equation {
 	}
 
 	// Continue to the next element
-	return resolveEquation(eq, currentResult, index+1)
+	return resolveEquation(eq, currentResult, index+1, operators)
 }
 
 func main() {
@@ -136,18 +138,27 @@ func main() {
 	}
 
 	resultPart1 := 0
+	resultPart2 := 0
 
 	for scanner.Scan() {
 		line := scanner.Text() // Read the current line as a string
 
 		log.Println(line)
 		eq := parseEquation(line)
-		cur := resolveEquation(&eq, eq.Elements[0].Number, 0)
 
-		if cur != nil {
-			resultPart1 += cur.Result
+		curP1 := resolveEquation(&eq, eq.Elements[0].Number, 0, []string{"+", "*"})
+
+		if curP1 != nil {
+			resultPart1 += curP1.Result
+		}
+
+		curP2 := resolveEquation(&eq, eq.Elements[0].Number, 0, []string{"+", "*", "||"})
+
+		if curP2 != nil {
+			resultPart2 += curP2.Result
 		}
 	}
 
 	log.Println("result part 1 ", resultPart1)
+	log.Println("result part 2 ", resultPart2)
 }
