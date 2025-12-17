@@ -5,7 +5,7 @@ ROLL_OF_PAPER = "@"
 
 def build_solution(mat: list[str]) -> tuple[list[str], int]:
     result = copy.deepcopy(mat)
-    nb_x = 0
+    nb_new_x = 0
 
     for i, line_content in enumerate(mat):
         for j, cur_char in enumerate(line_content):
@@ -56,9 +56,9 @@ def build_solution(mat: list[str]) -> tuple[list[str], int]:
 
             if nb_adjacents < 4:
                 result[i] = result[i][:j] + "x" + result[i][j + 1 :]
-                nb_x += 1
+                nb_new_x += 1
 
-    return result, nb_x
+    return result, nb_new_x
 
 
 def main():
@@ -71,9 +71,17 @@ def main():
             for line in file_content.splitlines():
                 mat.append(line)
 
-            res, nb_x = build_solution(mat)
-            print(f"mat: {res}")
-            print(f"nb x = {nb_x}")
+            result = 0
+            cur_mat = mat
+
+            while True:
+                cur_mat, nb_new_x = build_solution(cur_mat)
+                result += nb_new_x
+
+                if nb_new_x == 0:
+                    break
+
+            print(f"final result {result}")
 
     except Exception as e:
         print("failed!", e)
