@@ -44,6 +44,7 @@ class Resolver:
 
         return nb_zeros
 
+
 def main():
     try:
         resolver = Resolver(50)
